@@ -70,25 +70,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _signInWithGoogle() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      await _authService.signInWithGoogle();
-    } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
   void _goToRegister() {
     Navigator.push(
       context,
@@ -298,23 +279,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: OutlinedButton.icon(
-                  onPressed: _isLoading ? null : _signInWithGoogle,
-                  icon: const Icon(Icons.g_mobiledata),
-                  label: const Text('Sign in with Google'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: theme.textTheme.bodyLarge?.color,
-                    side: BorderSide(color: theme.dividerTheme.color!),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
                 ),
               ),
               const SizedBox(height: 32),
