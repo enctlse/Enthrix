@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "277454719789",
+    "project_id": "enthrix-b5bc9",
+    "storage_bucket": "enthrix-b5bc9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:277454719789:android:0345fdac4996092087e1a4",
+        "android_client_info": {
+          "package_name": "com.example.enthrix_messenger"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "277454719789-xxxxxxxxxxxxxxxx.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.enthrix_messenger",
+            "certificate_hash": ""
+          }
+        },
+        {
+          "client_id": "277454719789-xxxxxxxxxxxxxxxx.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA0V03pX5eCBvytm7dCv5bx-Uo5e3ChcIA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "277454719789-xxxxxxxxxxxxxxxx.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
