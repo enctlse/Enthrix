@@ -244,14 +244,7 @@ class _ChatScreenState extends State<ChatScreen> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Color(0xFF6366F1 + Random().nextInt(100000)),
-                    const Color(0xFF8B5CF6),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: theme.colorScheme.primary,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Center(
@@ -426,11 +419,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                        color: theme.colorScheme.primary,
                         borderRadius: BorderRadius.circular(24),
                       ),
                       child: const Icon(
@@ -471,14 +460,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                gradient: isMe
-                    ? const LinearGradient(
-                        colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: isMe ? null : theme.colorScheme.surface,
+                color: isMe ? theme.colorScheme.primary : theme.colorScheme.surface,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(20),
                   topRight: const Radius.circular(20),

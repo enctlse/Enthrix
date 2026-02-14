@@ -229,14 +229,7 @@ class _RegisterStepNicknameState extends State<RegisterStepNickname> {
                     width: 120,
                     height: 120,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          theme.colorScheme.primary.withOpacity(0.2),
-                          const Color(0xFF8B5CF6).withOpacity(0.2),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: theme.colorScheme.primary.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(30),
                     ),
                     child: Icon(

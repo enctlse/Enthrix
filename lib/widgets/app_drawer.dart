@@ -68,13 +68,7 @@ class _AppDrawerState extends State<AppDrawer> {
             width: double.infinity, // Full width to prevent cutting
             height: 220, // Fixed height instead of wrapping content
             padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [theme.colorScheme.primary, const Color(0xFF8B5CF6)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
+            color: theme.colorScheme.primary,
             child: _isLoading
                 ? const Center(
                     child: CircularProgressIndicator(color: Colors.white),

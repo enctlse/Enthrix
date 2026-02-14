@@ -307,14 +307,7 @@ class _SearchScreenState extends State<SearchScreen> {
               width: 50,
               height: 50,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    theme.colorScheme.primary.withOpacity(0.8),
-                    const Color(0xFF8B5CF6).withOpacity(0.8),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: theme.colorScheme.primary.withOpacity(0.8),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Center(

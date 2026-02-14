@@ -124,16 +124,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      theme.colorScheme.primary,
-                      const Color(0xFF8B5CF6),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
+                color: theme.colorScheme.primary,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
