@@ -105,7 +105,7 @@ class _AppDrawerState extends State<AppDrawer> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        _user?.email ?? 'user@example.com',
+                        _user != null ? '@${_user!.username}' : '@username',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.white.withOpacity(0.8),
@@ -206,7 +206,7 @@ class _AppDrawerState extends State<AppDrawer> {
           ),
           Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('Enthrix v1.0.0', style: theme.textTheme.labelLarge),
+            child: Text('Enthrix v1.0.9', style: theme.textTheme.labelLarge),
           ),
         ],
       ),

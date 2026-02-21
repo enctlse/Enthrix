@@ -20,9 +20,11 @@ class MessageService {
   final _messageController =
       StreamController<Map<String, List<MessageModel>>>.broadcast();
   StreamSubscription? _incomingMessagesSubscription;
+  StreamSubscription? _typingStatusSubscription;
 
 
   final Set<String> _activeChats = {};
+  final Map<String, Timer> _selfDestructTimers = {};
 
 
   bool _isInitialized = false;
@@ -32,6 +34,9 @@ class MessageService {
 
   Stream<Map<String, List<MessageModel>>> get messageStream =>
       _messageController.stream;
+
+  final _typingStatusController = StreamController<Map<String, bool>>.broadcast();
+  Stream<Map<String, bool>> get typingStatusStream => _typingStatusController.stream;
 
   Future<void> _saveChatsToStorage() async {
     try {
@@ -252,6 +257,10 @@ class MessageService {
     required String receiverId,
     required String plainText,
     String? existingChatId,
+    int? selfDestructSeconds,
+    String? replyToMessageId,
+    String? replyToText,
+    String type = 'text',
   }) async {
     final currentUser = _authService.currentUser;
     if (currentUser == null) throw Exception('Not authenticated');
@@ -270,6 +279,8 @@ class MessageService {
     }
 
 
+    print('SEND: Creating message with replyToMessageId=$replyToMessageId, replyToText=$replyToText');
+    
     final message = MessageModel(
       id: '${currentUser.uid}_${DateTime.now().millisecondsSinceEpoch}',
       chatId: chatId,
@@ -279,6 +290,10 @@ class MessageService {
       encryptedText: encryptedText,
       timestamp: DateTime.now(),
       status: MessageStatus.sending,
+      selfDestructSeconds: selfDestructSeconds,
+      replyToMessageId: replyToMessageId,
+      replyToText: replyToText,
+      type: type,
     );
 
 
@@ -365,6 +380,8 @@ class MessageService {
                     print('MSG: Decrypted ok');
 
 
+                    print('MSG: Reply data from server: replyToMessageId=${data['replyToMessageId']}, replyToText=${data['replyToText']}');
+                    
                     final message = MessageModel(
                       id: data['id'] ?? change.doc.id,
                       chatId: data['chatId'] ?? data['senderId'] ?? 'unknown',
@@ -377,7 +394,11 @@ class MessageService {
                           DateTime.now(),
                       type: data['type'] ?? 'text',
                       status: MessageStatus.delivered,
+                      replyToMessageId: data['replyToMessageId'],
+                      replyToText: data['replyToText'],
                     );
+                    
+                    print('MSG: Created message with replyToMessageId=${message.replyToMessageId}, replyToText=${message.replyToText}');
 
 
                     final chatId = message.chatId;
@@ -674,6 +695,192 @@ class MessageService {
     print('MessageService: Disposing');
     clear();
     _messageController.close();
+    _typingStatusController.close();
+  }
+
+  // ========== TYPING STATUS ==========
+  void startListeningForTypingStatus(String chatId, String currentUserId) {
+    _typingStatusSubscription?.cancel();
+    
+    final otherUserId = chatId.replaceFirst(currentUserId, '').replaceFirst('_', '');
+    
+    _typingStatusSubscription = _firestore
+        .collection('typingStatus')
+        .doc(chatId)
+        .collection('users')
+        .doc(otherUserId)
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists) {
+        final data = snapshot.data();
+        final isTyping = data?['isTyping'] ?? false;
+        _typingStatusController.add({chatId: isTyping});
+      }
+    });
+  }
+
+  Future<void> setTypingStatus(String chatId, bool isTyping) async {
+    final currentUser = _authService.currentUser;
+    if (currentUser == null) return;
+
+    try {
+      await _firestore
+          .collection('typingStatus')
+          .doc(chatId)
+          .collection('users')
+          .doc(currentUser.uid)
+          .set({
+        'isTyping': isTyping,
+        'timestamp': Timestamp.fromDate(DateTime.now()),
+      });
+
+      // Auto-clear typing status after 5 seconds
+      if (isTyping) {
+        Future.delayed(const Duration(seconds: 5), () async {
+          await _firestore
+              .collection('typingStatus')
+              .doc(chatId)
+              .collection('users')
+              .doc(currentUser.uid)
+              .update({'isTyping': false});
+        });
+      }
+    } catch (e) {
+      print('Error setting typing status: $e');
+    }
+  }
+
+  void stopListeningForTypingStatus() {
+    _typingStatusSubscription?.cancel();
+    _typingStatusSubscription = null;
+  }
+
+  // ========== SELF-DESTRUCT ==========
+  void startSelfDestructTimer(String chatId, MessageModel message) {
+    if (message.selfDestructSeconds == null || message.selfDestructSeconds! <= 0) return;
+
+    final timerKey = '${chatId}_${message.id}';
+    _selfDestructTimers[timerKey]?.cancel();
+
+    _selfDestructTimers[timerKey] = Timer(
+      Duration(seconds: message.selfDestructSeconds!),
+      () async {
+        await _deleteMessage(chatId, message.id);
+      },
+    );
+  }
+
+  Future<void> _deleteMessage(String chatId, String messageId) async {
+    if (_localMessages.containsKey(chatId)) {
+      final index = _localMessages[chatId]!.indexWhere((m) => m.id == messageId);
+      if (index != -1) {
+        _localMessages[chatId]![index] = _localMessages[chatId]![index].copyWith(
+          isDeleted: true,
+          text: '🕐 Сообщение удалено',
+        );
+        _messageController.add(Map.from(_localMessages));
+        await _saveChatsToStorage();
+      }
+    }
+    _selfDestructTimers.remove('${chatId}_${messageId}');
+  }
+
+  Future<void> deleteMessageForEveryone(String chatId, String messageId) async {
+    if (_localMessages.containsKey(chatId)) {
+      final index = _localMessages[chatId]!.indexWhere((m) => m.id == messageId);
+      if (index != -1) {
+        final message = _localMessages[chatId]![index];
+        _localMessages[chatId]![index] = message.copyWith(
+          isDeleted: true,
+          text: '🕐 Сообщение удалено',
+        );
+        _messageController.add(Map.from(_localMessages));
+        await _saveChatsToStorage();
+
+        // Send delete signal to other user
+        await _firestore
+            .collection('deleteSignals')
+            .doc(message.receiverId == _authService.currentUser?.uid 
+                ? message.senderId 
+                : message.receiverId)
+            .collection('signals')
+            .doc(messageId)
+            .set({
+          'messageId': messageId,
+          'chatId': chatId,
+          'timestamp': Timestamp.fromDate(DateTime.now()),
+        });
+      }
+    }
+  }
+
+  void startListeningForDeleteSignals(String userId) {
+    _firestore
+        .collection('deleteSignals')
+        .doc(userId)
+        .collection('signals')
+        .snapshots()
+        .listen((snapshot) async {
+      for (final change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.added) {
+          final data = change.doc.data();
+          if (data != null) {
+            final messageId = data['messageId'] as String?;
+            final chatId = data['chatId'] as String?;
+            
+            if (messageId != null && chatId != null) {
+              if (_localMessages.containsKey(chatId)) {
+                final index = _localMessages[chatId]!.indexWhere((m) => m.id == messageId);
+                if (index != -1) {
+                  _localMessages[chatId]![index] = _localMessages[chatId]![index].copyWith(
+                    isDeleted: true,
+                    text: '🕐 Сообщение удалено',
+                  );
+                  _messageController.add(Map.from(_localMessages));
+                  await _saveChatsToStorage();
+                }
+              }
+              // Delete the signal after processing
+              await change.doc.reference.delete();
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // ========== SEARCH ==========
+  List<MessageModel> searchMessages(String chatId, String query) {
+    if (!_localMessages.containsKey(chatId)) return [];
+    
+    final lowerQuery = query.toLowerCase();
+    return _localMessages[chatId]!
+        .where((msg) => 
+            !msg.isDeleted && 
+            msg.text.toLowerCase().contains(lowerQuery))
+        .toList();
+  }
+
+  List<Map<String, dynamic>> searchAllChats(String query) {
+    final results = <Map<String, dynamic>>[];
+    final lowerQuery = query.toLowerCase();
+    
+    for (final entry in _localMessages.entries) {
+      final matchingMessages = entry.value
+          .where((msg) => 
+              !msg.isDeleted && 
+              msg.text.toLowerCase().contains(lowerQuery))
+          .toList();
+      
+      if (matchingMessages.isNotEmpty) {
+        results.add({
+          'chatId': entry.key,
+          'messages': matchingMessages,
+        });
+      }
+    }
+    
+    return results;
   }
 }
 

@@ -25,7 +25,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late final TextEditingController _nameController;
   late final TextEditingController _usernameController;
   late final TextEditingController _bioController;
-  late final TextEditingController _emailController;
 
   @override
   void initState() {
@@ -33,7 +32,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _nameController = TextEditingController();
     _usernameController = TextEditingController();
     _bioController = TextEditingController();
-    _emailController = TextEditingController();
     _loadUserData();
   }
 
@@ -52,7 +50,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (user != null) {
             _nameController.text = user.name;
             _usernameController.text = user.username;
-            _emailController.text = user.email;
             _bioController.text = user.bio ?? 'Hey there! I am using Enthrix.';
           }
           _isLoading = false;
@@ -72,7 +69,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _nameController.dispose();
     _usernameController.dispose();
     _bioController.dispose();
-    _emailController.dispose();
     super.dispose();
   }
 
@@ -231,17 +227,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                         const Divider(height: 1),
-                        Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: _buildInfoItem(
-                            context,
-                            icon: Icons.email_outlined,
-                            label: 'Email',
-                            value: _emailController.text,
-                            isEditing: false,
-                            controller: _emailController,
-                          ),
-                        ),
                         const Divider(height: 1),
                         Padding(
                           padding: const EdgeInsets.all(20),

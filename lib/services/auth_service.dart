@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:crypto/crypto.dart';
+import 'dart:convert';
 import '../models/user_model.dart';
 import 'message_service.dart';
 import 'encryption_service.dart';
@@ -9,24 +11,38 @@ import 'encryption_service.dart';
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  GoogleSignIn? _googleSignIn;
   Timer? _statusUpdateTimer;
   StreamSubscription? _authSubscription;
-
-  GoogleSignIn get _googleSignInInstance {
-    _googleSignIn ??= GoogleSignIn();
-    return _googleSignIn!;
-  }
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
   User? get currentUser => _auth.currentUser;
 
-  Future<UserModel?> signInWithEmailAndPassword(
-    String email,
+  // Generate fake email from username for Firebase Auth
+  String _generateEmail(String username) {
+    return '${username.toLowerCase().replaceAll(' ', '_')}@enthrix.local';
+  }
+
+  // Generate recovery key
+  String generateRecoveryKey() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(32, (_) => random.nextInt(256));
+    return base64Url.encode(bytes).substring(0, 24).toUpperCase();
+  }
+
+  // Hash recovery key for storage
+  String _hashRecoveryKey(String recoveryKey) {
+    final bytes = utf8.encode(recoveryKey);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
+  Future<UserModel?> signInWithUsernameAndPassword(
+    String username,
     String password,
   ) async {
     try {
+      final email = _generateEmail(username);
       final result = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
@@ -49,64 +65,60 @@ class AuthService {
     }
   }
 
-  Future<UserModel?> signUpWithEmailAndPassword(
-    String email,
-    String password,
-    String name,
+  Future<Map<String, dynamic>> signUpWithUsernameAndPassword(
     String username,
+    String password,
   ) async {
     try {
-      if (!_isValidEmail(email)) {
-        throw 'Invalid email address format.';
+      if (username.length < 3) {
+        throw 'Username must be at least 3 characters long.';
       }
 
       if (password.length < 6) {
         throw 'Password must be at least 6 characters long.';
       }
 
-      print('Creating user with email: $email');
-
+      final email = _generateEmail(username);
+      
+      // Check if email is already registered
       try {
-        final methods = await _auth.fetchSignInMethodsForEmail(email.trim());
+        final methods = await _auth.fetchSignInMethodsForEmail(email);
         if (methods.isNotEmpty) {
-          throw 'Email is already registered.';
+          throw 'Username is already taken.';
         }
       } catch (e) {
-        if (e is String && e.contains('already registered')) {
+        if (e is String && e.contains('already taken')) {
           rethrow;
         }
       }
 
       final result = await _auth.createUserWithEmailAndPassword(
-        email: email.trim(),
+        email: email,
         password: password,
       );
 
       if (result.user != null) {
-        print('User created: ${result.user!.uid}');
-
-        try {
-          await result.user!.sendEmailVerification();
-          print('Verification email sent');
-        } catch (e) {
-          print('Failed to send verification email: $e');
-        }
+        // Wait for auth token to be ready
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // Generate recovery key
+        final recoveryKey = generateRecoveryKey();
+        final recoveryKeyHash = _hashRecoveryKey(recoveryKey);
 
         final userModel = UserModel(
           uid: result.user!.uid,
-          email: email.trim(),
-          name: name,
-          username: username,
+          name: username,
+          username: username.toLowerCase(),
           status: 'online',
           lastSeen: DateTime.now(),
           createdAt: DateTime.now(),
+          recoveryKeyHash: recoveryKeyHash,
         );
 
         await _firestore
             .collection('users')
             .doc(result.user!.uid)
             .set(userModel.toMap());
-        print('User data saved to Firestore');
 
         try {
           await EncryptionService().initialize(result.user!.uid);
@@ -114,117 +126,94 @@ class AuthService {
           await _firestore.collection('users').doc(result.user!.uid).update({
             'publicKey': publicKey,
           });
-          print('Public key saved to Firestore');
         } catch (e) {
           print('Failed to save public key: $e');
         }
 
-        return userModel;
+        return {
+          'user': userModel,
+          'recoveryKey': recoveryKey,
+        };
       }
-      return null;
+      return {};
     } catch (e) {
       print('SignUp Error: $e');
       throw _handleAuthError(e);
     }
   }
 
-  bool _isValidEmail(String email) {
-    final emailRegExp = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-    return emailRegExp.hasMatch(email);
-  }
-
-  Future<void> sendEmailVerification() async {
-    final user = _auth.currentUser;
-    if (user != null && !user.emailVerified) {
-      await user.sendEmailVerification();
-    }
-  }
-
-  Future<bool> isEmailVerified() async {
-    final user = _auth.currentUser;
-    if (user != null) {
-      await user.reload();
-      return user.emailVerified;
-    }
-    return false;
-  }
-
-  Future<void> reloadCurrentUser() async {
-    final user = _auth.currentUser;
-    if (user != null) {
-      await user.reload();
-    }
-  }
-
-  Future<UserModel?> signInWithGoogle() async {
+  // Recover account with recovery key
+  Future<Map<String, dynamic>?> recoverAccount(
+    String username,
+    String recoveryKey,
+  ) async {
     try {
-      final GoogleSignInAccount? googleUser = await _googleSignInInstance.signIn();
-      if (googleUser == null) return null;
-
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      final result = await _auth.signInWithCredential(credential);
-
-      if (result.user != null) {
-        final userDoc = await _firestore
-            .collection('users')
-            .doc(result.user!.uid)
-            .get();
-
-        if (!userDoc.exists) {
-          final userModel = UserModel(
-            uid: result.user!.uid,
-            email: result.user!.email!,
-            name: result.user!.displayName ?? 'User',
-            username: '@${result.user!.email!.split('@')[0]}',
-            avatarUrl: result.user!.photoURL,
-            status: 'online',
-            lastSeen: DateTime.now(),
-            createdAt: DateTime.now(),
-          );
-
-          await _firestore
-              .collection('users')
-              .doc(result.user!.uid)
-              .set(userModel.toMap());
-
-          try {
-            await EncryptionService().initialize(result.user!.uid);
-            final publicKey = EncryptionService().getPublicKeyString();
-            await _firestore.collection('users').doc(result.user!.uid).update({
-              'publicKey': publicKey,
-            });
-          } catch (e) {
-            print('Failed to save public key: $e');
-          }
-
-          return userModel;
-        }
-
-        try {
-          await EncryptionService().initialize(result.user!.uid);
-          final publicKey = EncryptionService().getPublicKeyString();
-          await _firestore.collection('users').doc(result.user!.uid).update({
-            'publicKey': publicKey,
-          });
-        } catch (e) {
-          print('Failed to initialize encryption: $e');
-        }
-
-        return UserModel.fromMap(userDoc.data()!);
+      // Find user by username
+      final usernameQuery = await _firestore
+          .collection('users')
+          .where('username', isEqualTo: username.toLowerCase())
+          .get();
+      
+      if (usernameQuery.docs.isEmpty) {
+        throw 'User not found.';
       }
-      return null;
+
+      final userData = usernameQuery.docs.first.data();
+      final storedHash = userData['recoveryKeyHash'] as String?;
+      
+      if (storedHash == null) {
+        throw 'Recovery key not set for this account.';
+      }
+
+      // Verify recovery key
+      final providedHash = _hashRecoveryKey(recoveryKey);
+      if (providedHash != storedHash) {
+        throw 'Invalid recovery key.';
+      }
+
+      return {
+        'uid': userData['uid'],
+        'username': userData['username'],
+        'name': userData['name'],
+      };
     } catch (e) {
-      final errorMsg = e.toString();
-      if (errorMsg.contains('ClientID') || errorMsg.contains('client_id') || errorMsg.contains('google-signin-client_id')) {
-        throw 'Google Sign-In is not configured for web. Please use email/password sign-in instead.';
+      throw _handleAuthError(e);
+    }
+  }
+
+  // Reset password after recovery
+  Future<void> resetPasswordWithRecovery(
+    String username,
+    String recoveryKey,
+    String newPassword,
+  ) async {
+    try {
+      if (newPassword.length < 6) {
+        throw 'Password must be at least 6 characters long.';
       }
+
+      // Verify recovery key first
+      final userInfo = await recoverAccount(username, recoveryKey);
+      if (userInfo == null) {
+        throw 'Recovery failed.';
+      }
+
+      // Generate new recovery key
+      final newRecoveryKey = generateRecoveryKey();
+      final newRecoveryKeyHash = _hashRecoveryKey(newRecoveryKey);
+
+      // We need to sign in as admin to change password - for now, user needs to know old password
+      // Or we can implement custom logic
+      // For simplicity, we'll update the recovery key and inform user to contact support
+      
+      await _firestore.collection('users').doc(userInfo['uid']).update({
+        'recoveryKeyHash': newRecoveryKeyHash,
+      });
+
+      // Note: In production, you'd need a cloud function or admin SDK to reset password
+      // without knowing the old one. For now, we'll inform the user.
+      throw 'Password reset requires re-authentication. Please contact support or use the app settings if logged in.';
+    } catch (e) {
       throw _handleAuthError(e);
     }
   }
@@ -235,7 +224,6 @@ class AuthService {
     
     messageService.clear();
     
-    await _googleSignInInstance.signOut();
     await _auth.signOut();
   }
 
@@ -258,6 +246,22 @@ class AuthService {
     }
   }
 
+  Future<UserModel?> getUserByUsername(String username) async {
+    try {
+      final query = await _firestore
+          .collection('users')
+          .where('username', isEqualTo: username.toLowerCase())
+          .get();
+      
+      if (query.docs.isNotEmpty) {
+        return UserModel.fromMap(query.docs.first.data());
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<void> updateUserStatus(String status) async {
     if (currentUser != null) {
       await _firestore.collection('users').doc(currentUser!.uid).update({
@@ -273,7 +277,6 @@ class AuthService {
       if (user != null) {
         _setOnline();
         _startPeriodicStatusUpdate();
-
         messageService.initialize();
       } else {
         _setOffline();
@@ -360,33 +363,24 @@ class AuthService {
       );
       switch (error.code) {
         case 'user-not-found':
-          return 'No user found with this email.';
+          return 'Invalid username or password.';
         case 'wrong-password':
-          return 'Wrong password provided.';
+          return 'Invalid username or password.';
         case 'email-already-in-use':
-          return 'Email is already registered.';
+          return 'Username is already taken.';
         case 'weak-password':
           return 'Password is too weak.';
         case 'invalid-email':
-          return 'Invalid email address.';
+          return 'Invalid username format.';
         case 'network-request-failed':
           return 'Network error. Please check your internet connection.';
         case 'too-many-requests':
           return 'Too many attempts. Please try again later.';
         case 'invalid-credential':
-          return 'Invalid email or password.';
-        case 'operation-not-allowed':
-          return 'Email/password sign-in is not enabled. Please contact support.';
+          return 'Invalid username or password.';
         default:
-          return 'Authentication error (${error.code}): ${error.message}';
+          return 'Authentication error: ${error.message}';
       }
-    }
-
-    final errorStr = error.toString();
-    if (errorStr.contains('PigeonUserDetails') ||
-        errorStr.contains('type') && errorStr.contains('is not a subtype')) {
-      print('Internal Firebase error: $errorStr');
-      return 'Authentication service error. Please try again.';
     }
 
     if (error is String) {
@@ -395,4 +389,3 @@ class AuthService {
     return 'Error: $error';
   }
 }
-

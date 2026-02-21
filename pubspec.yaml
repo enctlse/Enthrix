@@ -1,7 +1,7 @@
 name: enthrix_messenger
 description: A modern Flutter messenger app
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.9+9
 
 environment:
   sdk: ^3.10.8
@@ -19,6 +19,9 @@ dependencies:
   pointycastle: ^3.9.1
   flutter_secure_storage: ^9.2.4
   shared_preferences: ^2.5.3
+  secure_application: ^4.0.0
+  http: ^1.2.0
+  tor_hidden_service: ^0.0.4
 
 dev_dependencies:
   flutter_test:

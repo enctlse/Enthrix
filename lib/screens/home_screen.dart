@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/app_drawer.dart';
 import '../services/auth_service.dart';
 import '../services/message_service.dart';
+import '../services/settings_service.dart';
 import '../models/user_model.dart';
 import 'search_screen.dart';
 import 'chat_screen.dart';
@@ -24,6 +25,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _authService = AuthService();
   final _messageService = messageService;
+  final _settingsService = SettingsService();
   List<Map<String, dynamic>> _chats = [];
 
   String _formatTimestamp(Timestamp? timestamp) {
@@ -50,6 +52,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<UserModel?> _getOtherUserInfo(String userId) async {
     return await _authService.getUserData(userId);
+  }
+
+  String _getContactName(String userId, String defaultName) {
+    final customName = _settingsService.getContactName(userId);
+    return customName ?? defaultName;
   }
 
   void _loadChats() {
@@ -225,19 +232,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     }
 
                     final otherUser = userSnapshot.data!;
+                    final displayName = _getContactName(otherUser.uid, otherUser.name);
 
                     return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
+                      margin: const EdgeInsets.only(bottom: 8),
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(12),
                         side: BorderSide(
                           color:
                               theme.dividerTheme.color ?? Colors.grey.shade200,
                         ),
                       ),
                       child: ListTile(
-                        contentPadding: const EdgeInsets.all(16),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         leading: Container(
                           width: 56,
                           height: 56,
@@ -248,7 +256,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: Center(
                             child: Text(
                               otherUser.name.isNotEmpty
-                                  ? otherUser.name[0]
+                                  ? displayName.isNotEmpty ? displayName[0] : "?"
                                   : '?',
                               style: const TextStyle(
                                 color: Colors.white,
@@ -259,7 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         title: Text(
-                          otherUser.name,
+                          displayName,
                           style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 16,
@@ -308,7 +316,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => ChatScreen(
-                                userName: otherUser.name,
+                                userName: displayName,
                                 chatId: chat['chatId'],
                                 otherUserId: otherUser.uid,
                                 isDarkMode: widget.isDarkMode,

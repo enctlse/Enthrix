@@ -8,6 +8,11 @@ enum MessageStatus {
   failed,
 }
 
+enum MessageType {
+  text,
+  sticker,
+}
+
 class MessageModel {
   final String id;
   final String chatId;
@@ -20,6 +25,10 @@ class MessageModel {
   final String? fileUrl;
   final MessageStatus status;
   final DateTime? readAt;
+  final int? selfDestructSeconds;
+  final String? replyToMessageId;
+  final String? replyToText;
+  final bool isDeleted;
 
   MessageModel({
     required this.id,
@@ -33,6 +42,10 @@ class MessageModel {
     this.fileUrl,
     this.status = MessageStatus.sending,
     this.readAt,
+    this.selfDestructSeconds,
+    this.replyToMessageId,
+    this.replyToText,
+    this.isDeleted = false,
   });
 
   factory MessageModel.fromMap(Map<String, dynamic> map) {
@@ -48,6 +61,10 @@ class MessageModel {
       fileUrl: map['fileUrl'],
       status: _parseStatus(map['status']),
       readAt: (map['readAt'] as Timestamp?)?.toDate(),
+      selfDestructSeconds: map['selfDestructSeconds'],
+      replyToMessageId: map['replyToMessageId'],
+      replyToText: map['replyToText'],
+      isDeleted: map['isDeleted'] ?? false,
     );
   }
 
@@ -64,6 +81,10 @@ class MessageModel {
       'fileUrl': fileUrl,
       'status': status.toString().split('.').last,
       'readAt': readAt != null ? Timestamp.fromDate(readAt!) : null,
+      'selfDestructSeconds': selfDestructSeconds,
+      'replyToMessageId': replyToMessageId,
+      'replyToText': replyToText,
+      'isDeleted': isDeleted,
     };
   }
 
@@ -80,6 +101,10 @@ class MessageModel {
       'fileUrl': fileUrl,
       'status': status.toString().split('.').last,
       'readAt': readAt?.toIso8601String(),
+      'selfDestructSeconds': selfDestructSeconds,
+      'replyToMessageId': replyToMessageId,
+      'replyToText': replyToText,
+      'isDeleted': isDeleted,
     };
   }
 
@@ -98,6 +123,10 @@ class MessageModel {
       fileUrl: map['fileUrl'],
       status: _parseStatus(map['status']),
       readAt: map['readAt'] != null ? DateTime.parse(map['readAt']) : null,
+      selfDestructSeconds: map['selfDestructSeconds'],
+      replyToMessageId: map['replyToMessageId'],
+      replyToText: map['replyToText'],
+      isDeleted: map['isDeleted'] ?? false,
     );
   }
 
@@ -117,6 +146,10 @@ class MessageModel {
       'expiresAt': Timestamp.fromDate(
         DateTime.now().add(const Duration(days: 7)),
       ),
+      'selfDestructSeconds': selfDestructSeconds,
+      'replyToMessageId': replyToMessageId,
+      'replyToText': replyToText,
+      'isDeleted': isDeleted,
     };
   }
 
@@ -148,6 +181,10 @@ class MessageModel {
     String? fileUrl,
     MessageStatus? status,
     DateTime? readAt,
+    int? selfDestructSeconds,
+    String? replyToMessageId,
+    String? replyToText,
+    bool? isDeleted,
   }) {
     return MessageModel(
       id: id ?? this.id,
@@ -161,6 +198,10 @@ class MessageModel {
       fileUrl: fileUrl ?? this.fileUrl,
       status: status ?? this.status,
       readAt: readAt ?? this.readAt,
+      selfDestructSeconds: selfDestructSeconds ?? this.selfDestructSeconds,
+      replyToMessageId: replyToMessageId ?? this.replyToMessageId,
+      replyToText: replyToText ?? this.replyToText,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 }

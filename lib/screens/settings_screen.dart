@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import 'chat_customization_screen.dart';
+import 'tor_settings_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final bool isDarkMode;
@@ -98,6 +100,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                 ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.secondary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.palette_outlined,
+                      color: theme.colorScheme.secondary,
+                      size: 20,
+                    ),
+                  ),
+                  title: const Text('Chat Customization'),
+                  subtitle: const Text('Customize chat appearance'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ChatCustomizationScreen(),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -151,6 +179,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                 ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.security,
+                      color: Colors.purple,
+                      size: 20,
+                    ),
+                  ),
+                  title: const Text('Tor Connection'),
+                  subtitle: const Text('Anonymous internet connection'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const TorSettingsScreen(),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -203,7 +257,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Version 1.0.0',
+                  'Version 1.0.9',
                   style: TextStyle(
                     color: theme.iconTheme.color?.withOpacity(0.4),
                     fontSize: 12,

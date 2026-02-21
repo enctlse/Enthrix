@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:enthrix_messenger/screens/register_screen.dart';
 import '../services/auth_service.dart';
+import 'register_screen.dart';
+import 'recovery_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final bool isDarkMode;
@@ -17,7 +18,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _authService = AuthService();
   bool _obscurePassword = true;
@@ -26,13 +27,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _login() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+    if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
       setState(() {
         _errorMessage = 'Please fill in all fields';
       });
@@ -45,20 +46,10 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final user = await _authService.signInWithEmailAndPassword(
-        _emailController.text.trim(),
+      await _authService.signInWithUsernameAndPassword(
+        _usernameController.text.trim(),
         _passwordController.text.trim(),
       );
-
-      final isVerified = await _authService.isEmailVerified();
-      if (!isVerified && mounted) {
-        setState(() {
-          _errorMessage =
-              'Please verify your email before logging in. Check your inbox for the verification link.';
-        });
-        await _authService.signOut();
-        return;
-      }
     } catch (e) {
       setState(() {
         _errorMessage = e.toString();
@@ -82,6 +73,15 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  void _goToRecovery() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RecoveryScreen(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -93,45 +93,47 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 40),
+              const SizedBox(height: 60),
+              // App icon
               Center(
                 child: Container(
                   width: 100,
                   height: 100,
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
+                    color: theme.colorScheme.primary,
                     borderRadius: BorderRadius.circular(28),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
                   ),
-                  child: const Icon(
-                    Icons.message_rounded,
-                    color: Colors.white,
-                    size: 48,
+                  clipBehavior: Clip.antiAlias,
+                  child: Image.asset(
+                    'icon.png',
+                    fit: BoxFit.cover,
                   ),
                 ),
               ),
               const SizedBox(height: 40),
               Center(
                 child: Text(
-                  'Welcome Back',
-                  style: theme.textTheme.headlineLarge,
+                  'Enthrix',
+                  style: TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.primary,
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
               Center(
                 child: Text(
-                  'Sign in to continue',
-                  style: theme.textTheme.bodyLarge,
+                  'Secure Messaging',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                  ),
                 ),
               ),
+              const SizedBox(height: 48),
+              
               if (_errorMessage != null) ...[
-                const SizedBox(height: 24),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -151,21 +153,21 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 24),
               ],
-              const SizedBox(height: 48),
-              Text('Email', style: theme.textTheme.labelLarge),
+
+              Text('Username', style: theme.textTheme.labelLarge),
               const SizedBox(height: 8),
               TextField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
+                controller: _usernameController,
                 enabled: !_isLoading,
                 decoration: InputDecoration(
-                  hintText: 'Enter your email',
+                  hintText: 'Enter your username',
                   hintStyle: TextStyle(
                     color: theme.iconTheme.color?.withOpacity(0.5),
                   ),
                   prefixIcon: Icon(
-                    Icons.email_outlined,
+                    Icons.person_outline,
                     color: theme.iconTheme.color,
                   ),
                   filled: true,
@@ -188,6 +190,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 20),
+              
               Text('Password', style: theme.textTheme.labelLarge),
               const SizedBox(height: 8),
               TextField(
@@ -235,13 +238,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
+              
               const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: _goToRecovery,
                   child: Text(
-                    'Forgot Password?',
+                    'Forgot password?',
                     style: TextStyle(
                       color: theme.colorScheme.primary,
                       fontWeight: FontWeight.w600,
@@ -249,7 +253,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              
+              const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -281,36 +286,27 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                 ),
               ),
+              
               const SizedBox(height: 32),
-              Row(
-                children: [
-                  Expanded(child: Divider(color: theme.dividerTheme.color)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text('or', style: theme.textTheme.bodyMedium),
-                  ),
-                  Expanded(child: Divider(color: theme.dividerTheme.color)),
-                ],
-              ),
-              const SizedBox(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "Don't have an account? ",
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  GestureDetector(
-                    onTap: _goToRegister,
-                    child: Text(
-                      'Sign Up',
-                      style: TextStyle(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
+              Center(
+                child: GestureDetector(
+                  onTap: _goToRegister,
+                  child: RichText(
+                    text: TextSpan(
+                      text: "Don't have an account? ",
+                      style: theme.textTheme.bodyMedium,
+                      children: [
+                        TextSpan(
+                          text: 'Create one',
+                          style: TextStyle(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
             ],
           ),
@@ -319,4 +315,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-
